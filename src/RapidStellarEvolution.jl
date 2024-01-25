@@ -1,5 +1,5 @@
 module RapidStellarEvolution
 
-# Write your package code here.
+include("fitting_coefficients.jl")
 
 end
