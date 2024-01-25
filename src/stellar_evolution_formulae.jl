@@ -119,10 +119,11 @@ function fractional_timescale(t, tMS)
     return t/tMS
 end
 
-function ms_luminosity()
+function ms_luminosity(M, M_hook,  L_TMS, L_ZAMS, tMS, τ, a₃₃, a₃₅, a₃₆, a₃₇)
     ϵ = 0.01
 
     η = ifelse(Z <= 0.0009, ifelse(M <= 1.1, 20, 10), 10)
+    ΔL = luminosity_perturbation(M, M_hool, a₃₃, a₃₅, a₃₆, a₃₇)
 end
 
 function luminosity_perturbation(M, M_hook, a₃₃, a₃₅=0.4, a₃₆, a₃₇=0.6)
@@ -153,6 +154,72 @@ function radius_perturbation(M, M_hook, a₃₈, a₃₉, a₄₀, a₄₁=3.57,
     end
 
 end
+
+function luminosity_coefficient_alpha(M, a₄₅, a₄₆, a₄₇, a₄₈, a₄₉, a₅₀, a₅₁, a₅₂, a₅₃)
+    if M > 2
+        return (a₄₅ + a₄₆*M^a₄₈)/(M^0.4 + a₄₇*M^1.9)
+    elseif M < 0.5
+        return a₄₉
+    elseif (0.5 <= M <= 0.7)
+        return a₄₉ + 5*(0.3 - a₄₉)*(M - 0.5)
+    elseif (0.7 <= M < a₅₂)
+        return 0.3 + (a₅₀ - 0.3)*(M - 0.7)/(a₅₂ - 0.7)
+    elseif (a₅₂ <= M < a₅₃)
+        return a₅₀ + (a₅₁ - a₅₀)*(M - a₅₂)/(a₅₃ - a₅₂)
+    elseif (a₅₃ <= M < 2)
+        B = luminosity_coefficient_alpha(2, a₄₅, a₄₆, a₄₇, a₄₈, a₄₉, a₅₀, a₅₁, a₅₂, a₅₃)
+        return a₅₁ + (B - a₅₁)*(M - a₅₃)/(2 - a₅₃)
+end
+
+function luminosity_coefficient_beta(M, a₅₄, a₅₅, a₅₇, a₅₆=0.96)
+    β_L = max(0.0, a₅₄ - a₅*M^a₅₆)
+    if (M > a₅₇) && (β_L > 0.0)
+        B = luminosity_coefficient_beta(a₅₇, a₅₄, a₅₅, a₅₇, a₅₆)
+        β_L = max(0.0, B - 10*(M - a₅₇)*B)
+    end
+
+    return β_L
+end
+
+
+function radius_coefficient_alpha(M, a₅₈, a₅₉, a₆₀, a₆₁, a₆₂, a₆₆=1.4, a₆₇=5.2)
+    if (a₆₆ <= M <= a₆₇)
+        return (a₅₈*M^a₆₀)/(a₅₉*M^a₆₁)
+    elseif M < 0.5
+        return a₆₂
+    elseif (0.5 <= M < 0.65)
+        return a₆₂ + (a₆₃ - a₆₂)*(M - 0.5)/0.15
+    elseif (0.65 <= M < a₆₈)
+        return a₆₃ + (a₆₄ - a₆₃)*(M - 0.65)/(a₆₈ - 0.65)
+    elseif (a₆₈ <= M < a₆₆)
+        B = radius_coefficient_alpha(a₆₆, a₅₈, a₅₉, a₆₀, a₆₁, a₆₂, a₆₆, a₆₇)
+        C = radius_coefficient_alpha(a₆₇, a₅₈, a₅₉, a₆₀, a₆₁, a₆₂, a₆₆, a₆₇)
+        a₆₄ + (B - a₆₄)*(M - a₆₈)/(a₆₆ - a₆₈)
+    elseif M < a₆₇
+        return C + a₆₅*(M - a₆₇)
+    end
+end
+
+function radius_coefficient_beta(M, a₇₂, a₇₃, a₇₄, a₇₅, a₇₆, a₇₇, a₇₈, a₇₉, a₈₀, a₈₁, a₇₁=3.45) 
+
+    if (2 <= M <= 16)
+        β_R_prime = (a₆₉*M^3.5)/(a₇₀ + M^a₇₁)
+    elseif M <= 1
+        β_R_prime = 1.06
+    elseif (1 < M < a₇₄)
+        β_R_prime = 1.06 + (a₇₂ - 1.06)*(M - 1)/(a₇₄ - 1.06)
+    elseif (a₇₄ <= M < 2)
+        B = radius_coefficient_beta(2, a₇₂, a₇₃, a₇₄, a₇₅, a₇₆, a₇₇, a₇₈, a₇₉, a₈₀, a₈₁, a₇₁) 
+        return a₇₂ + (B - a₇₂)*(M - a₇₄)/(2 - a₇₄)
+    elseif M > 16
+        C = radius_coefficient_beta(16, a₇₂, a₇₃, a₇₄, a₇₅, a₇₆, a₇₇, a₇₈, a₇₉, a₈₀, a₈₁, a₇₁)
+        return C + a₇₃*(M - 16)
+    end
+    
+end
+
+
+
 
 function envelope_structure(mass::Real, radius, core_mass, core_radius, stellar_type, age, Z=0.02)
     tMS, tBGB = main_sequence_lifetime(mass, Z)
