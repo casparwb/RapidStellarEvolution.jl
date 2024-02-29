@@ -114,19 +114,73 @@ function bgb_luminosity(M, a₂₇, a₂₈, a₂₉, a₃₀, a₃₁=4.60, a�
     return (a₂₇*M^a₃₁ + a₂₈*M^c₂)/(a₂₉ + a₃₀*M^c₃ + M^a₃₂)
 end
 
-
+"""
+τ
+"""
 function fractional_timescale(t, tMS)
     return t/tMS
 end
 
-function ms_luminosity(M, M_hook,  L_TMS, L_ZAMS, tMS, τ, a₃₃, a₃₅, a₃₆, a₃₇)
+function ms_luminosity(M, L_TMS, L_ZAMS, t, t_hook, τ, a₃₃, a₃₅, a₃₆, a₃₇)
     ϵ = 0.01
 
     η = ifelse(Z <= 0.0009, ifelse(M <= 1.1, 20, 10), 10)
     ΔL = luminosity_perturbation(M, M_hool, a₃₃, a₃₅, a₃₆, a₃₇)
+
+    αL = luminosity_coefficient_alpha(M, a₄₅, a₄₆, a₄₇, a₄₈, a₄₉, a₅₀, a₅₁, a₅₂, a₅₃)
+    βL = luminosity_coefficient_beta(M, a₅₄, a₅₅, a₅₇, a₅₆=0.96)
+
+    τ₁ = min(1, t/t_hook)
+    τ₂ = max(0.0, min(1, (t - (1 - ϵ)*t_hook)/(ϵ*t_hook)))
+    log_LMS_LZAMS = αL*τ + βL*τ^η + (log10(L_TMS/L_ZAMS) - αL - βL)*τ^2 - 
+                    ΔL*(τ₁^2 - τ₂^2)
+    return 10^log_LMS_LZAMS*L_ZAMS
 end
 
-function luminosity_perturbation(M, M_hook, a₃₃, a₃₅=0.4, a₃₆, a₃₇=0.6)
+function ms_radius(M, R_TMS, R_ZAMS, t, t_hook, τ, γ, 
+                   a₅₈, a₅₉, a₆₀, a₆₁, a₆₂,
+                   a₇₂, a₇₃, a₇₄, a₇₅, a₇₆, a₇₇, a₇₈, a₇₉, a₈₀, a₈₁)
+
+    
+
+    ΔR = radius_perturbation(M, M_hook, a₃₈, a₃₉, a₄₀, a₄₂, a₄₃)
+
+    αR = radius_coefficient_alpha(M, a₅₈, a₅₉, a₆₀, a₆₁, a₆₂)
+    βR = radius_coefficient_beta(M, a₇₂, a₇₃, a₇₄, a₇₅, a₇₆, a₇₇, a₇₈, a₇₉, a₈₀, a₈₁) 
+
+    τ₁ = min(1, t/t_hook)
+    τ₂ = max(0.0, min(1, (t - (1 - ϵ)*t_hook)/(ϵ*t_hook)))
+
+    log_RMS_RZAMS = αR*τ + βR*τ^10 + γ*τ^40 + 
+                    (log10(R_TMS/R_ZAMS) - αR - βR - γ)*τ^3 - 
+                    ΔR*(τ₁^3 - τ₂^3)
+
+    R_MS =  10^log_RMS_RZAMS*R_ZAMS
+    if M < 0.1
+        return max(R_MS, 0.0258*(1 + X)^(5/3)*M^(-1/3))
+    end
+    
+    return R_MS
+end
+
+function gamma(M, a₇₅, a₇₆, a₇₇, a₇₈, a₇₉, a₈₀)
+
+    if M <= 1
+        γ =  a₇₆ + a₇₇*(M - a₇₈)^a₇₉
+    elseif (1 < M <= a₇₅)
+        B = gamma(1.0, a₇₅, a₇₆, a₇₇, a₇₈, a₇₉, a₈₀)
+        γ =  B + (a₈₀ - B)*((M - 1)/(a₇₅ - 1))^a₈₁
+    elseif (a₇₅ < M < (a₇₅ + 1))
+        B = gamma(1.0, a₇₅, a₇₆, a₇₇, a₇₈, a₇₉, a₈₀)
+        C = ifelse(a₇₅ < 1, B, a₈₀)
+        γ = C - 10*(M - a₇₅)*C
+    end
+
+    @assert γ >= zero(γ) "γ must be >= 0"
+    return γ
+end
+
+function luminosity_perturbation(M, M_hook, a₃₃, a₃₆, a₃₅=0.4, a₃₇=0.6)
 
     if M <= M_hook
         return 0.0
@@ -136,11 +190,9 @@ function luminosity_perturbation(M, M_hook, a₃₃, a₃₅=0.4, a₃₆, a₃�
     elseif M >= a₃₃
         return min(a₃₄/M^(a₃₅), a₃₆/M^a₃₇)
     end
-    
-
 end
 
-function radius_perturbation(M, M_hook, a₃₈, a₃₉, a₄₀, a₄₁=3.57, a₄₂, a₄₃, a₄₄=1.0)
+function radius_perturbation(M, M_hook, a₃₈, a₃₉, a₄₀, a₄₂, a₄₃, a₄₁=3.57, a₄₄=1.0)
 
     if M <= M_hook
         return 0.0
@@ -215,9 +267,55 @@ function radius_coefficient_beta(M, a₇₂, a₇₃, a₇₄, a₇₅, a₇₆,
         C = radius_coefficient_beta(16, a₇₂, a₇₃, a₇₄, a₇₅, a₇₆, a₇₇, a₇₈, a₇₉, a₈₀, a₈₁, a₇₁)
         return C + a₇₃*(M - 16)
     end
-    
 end
 
+
+function fractional_hg_timescale(t, t_MS, t_BGB)
+    return (t - t_MS)/(t_BGB - t_MS)
+end
+
+function hg_luminosity(L_TMS, L_EHG, τ)
+    return L_TMS*(L_EHG/L_TMS)^τ
+end
+
+function hg_radius(R_TMS, R_EHG, τ)
+    return R_TMS*(R_EHG/R_TMS)^τ
+end
+
+function ms_core_mass()
+    return 0.0
+end
+
+"""
+Core mass at the end of the HG
+"""
+function ehg_core_mass(M, L_BGB, M_HeF, M_FBG)
+    if M < M_HeF
+        return M_c_GB(L_BGB)
+    elseif (M_HeF <= M < M_FGB)
+        return M_c_BGB
+    elseif M >= M_FGB
+        return M_c_HeI
+    end
+end
+
+# """
+# Core mass at the end of the MS
+# """
+# function tms_core_mass(M, M_c_EHG)
+#     M_exp = M^5.25
+#     ϱ = (1.586 + M_exp)/(2.434 + 1.02*M_exp)
+#     return ρ*M_c_EHG
+# end
+
+"""
+Core mass at the start of the HG
+"""
+function hg_core_mass(M, M_c_EHG, τ)
+    M_exp = M^5.25
+    ϱ = (1.586 + M_exp)/(2.434 + 1.02*M_exp)
+    return ((1 - τ)*ϱ + τ)*M_c_EHG
+end
 
 
 

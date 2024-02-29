@@ -1,4 +1,29 @@
 
+struct StellarObject{T <: Real, coeff_Type}
+    M::T
+    Z::T
+    sigma::T
+    zeta::T
+    rho::T
+    a::coeff_Type
+    b::coeff_Type
+end
+
+function StellarObject(mass, metallicity)
+    Z = metallicity
+    ζ = log10(Z/0.02)
+    ρ = ζ + 1
+    σ = log10(Z)
+
+    a_ns = keys(a_parameters)
+    b_ns = keys(b_parameters)
+
+    a_coeffs = Dict{Int, Float64}(a => get_a_coefficient(a, Z, ζ, σ, ρ) for a in a_ns)
+    b_coeffs = Dict{Int, Float64}(b => get_b_coefficient(b, Z, ζ, σ, ρ) for b in b_ns)
+
+    StellarObject(mass, metallicity, σ, ζ, ρ, a_coeffs, b_coeffs)
+end
+
 struct SECoefficient{T<:Real}
     α::T
     β::T
